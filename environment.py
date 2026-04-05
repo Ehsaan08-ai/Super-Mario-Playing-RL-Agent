@@ -6,6 +6,7 @@ import gym_super_mario_bros
 import yaml
 import torch.nn as nn
 import torch.optim as optim
+import torch.transforms as transform
 from gym.wrappers import FrameStack, GrayScaleObservation, ResizeObservation 
 
 
@@ -52,4 +53,8 @@ class GrayScaleObservation(gym.ObservationWrapper):
         observation = torch.tensor(observation.copy(), dtype=torch.float32)
         return observation
 
-    
+    def observation(self, observation):
+        observation = self.permute_orientation(observation)
+        observation = T.Grayscale()
+        observation = transform(observation)
+        return observation
