@@ -15,8 +15,14 @@ elif torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
-class Agent:
-    def run(self, is_training=True, render=False):
-        env = gym_super_mario_bros.make("SuperMarioBros-v0", render_mode="human" if render else "rgb_array")
+env = gym_super_mario_bros.make("SuperMarioBros-v0", render_mode="human" if render else "rgb_array")
         
-        
+env = JoypadSpace(env, [["right"], ["right", "A"]])
+env = ResizeObservation(env, shape=(84, 84))
+env = GrayScaleObservation(env)
+env = FrameStack(env, num_stack=4)
+
+env.reset()
+next_state, reward, done, truncate, info = env.step(action=0)
+
+    
