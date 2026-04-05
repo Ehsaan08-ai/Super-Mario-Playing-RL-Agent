@@ -1,6 +1,7 @@
 import os
 import random
 import torch
+import numpy as np 
 import gym_super_mario_bros
 import yaml
 import torch.nn as nn
@@ -44,3 +45,11 @@ class GrayScaleObservation(gym.ObservationWrapper):
             shape=obs_shape[0],
             dtype=np.uint8
         ) 
+
+    def permute_orientation(self, observation):
+        # Convert the [H, W, C]array to [C, H, W]    
+        observation =  np.transpose(observation, (2, 0, 1))
+        observation = torch.tensor(observation.copy(), dtype=torch.float32)
+        return observation
+
+    
