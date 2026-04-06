@@ -3,7 +3,7 @@ import torch
 import numpy as np 
 import gym_super_mario_bros
 import torch.transforms as T 
-from gym.wrappers import FrameStack, GrayScaleObservation, ResizeObservation
+from gym.wrappers import FrameStack
 from gym.spaces import Box
 from nes_py.wrappers import JoypadSpace
 
@@ -14,10 +14,6 @@ elif torch.cuda.is_available():
     device = torch.device("cuda")
 else:
     device = torch.device("cpu")
-
-env = gym_super_mario_bros.make("SuperMarioBros-v0", render_mode="human" if render else "rgb_array")
-        
-env = JoypadSpace(env, [["right"], ["right", "A"]])
 
 class SkipFrame:
     def __init__(self, env, skip):
@@ -67,3 +63,11 @@ class GrayScalePermutation(gym.ObservationWrapper): # This class turns the game 
         grayscale = T.Grayscale() # This line actually removes the color
         resize = T.Resize((84, 84)) # This line resizes the image
         return resize(grayscale(observation))
+    
+def create_env(render=False):
+    env = gym_super_mario_bros.make("SuperMarioBros-v0", render_mode="human" if render else "rgb_array")       
+    env = JoypadSpace(env, [["right"], ["right", "A"]])
+    env = SkipFrame(env, 4) # Skip frames + max pooling
+    env = GrayScalePermutation(env) # Grayscale + resize + permute (all-in-one)
+    env = FrameStack(env, 4) # Stacking 4 frames together
+    return env
