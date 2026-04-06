@@ -1,21 +1,21 @@
-import gym
+import gymnasium as gym 
 import torch
 import numpy as np 
 import gym_super_mario_bros
 import torch.transforms as T 
-from gym.wrappers import FrameStack
-from gym.spaces import Box
+from gymnasium.wrappers import FrameStack
+from gymnasium.spaces import Box
 from nes_py.wrappers import JoypadSpace
 
 
-if torch.backend.mps.is_available():
+if torch.backends.mps.is_available():
     device = torch.device("mps")
 elif torch.cuda.is_available():
     device = torch.device("cuda")
 else:
     device = torch.device("cpu")
 
-class SkipFrame:
+class SkipFrame(gym.Wrapper):
     def __init__(self, env, skip):
         super().__init__(env)
         self._skip = skip # No. of frames to skip
