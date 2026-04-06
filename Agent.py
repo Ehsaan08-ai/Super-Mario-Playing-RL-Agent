@@ -8,6 +8,8 @@ import yaml
 from environment import create_env 
 
 class Mario:
+    env = create_env()
+     
     def __init__(self):
         pass
 
