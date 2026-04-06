@@ -1,12 +1,7 @@
-import os
 import gym
-import random
 import torch
 import numpy as np 
 import gym_super_mario_bros
-import yaml
-import torch.nn as nn
-import torch.optim as optim
 import torch.transforms as T 
 from gym.wrappers import FrameStack, GrayScaleObservation, ResizeObservation
 from gym.spaces import Box
@@ -36,6 +31,7 @@ class SkipFrame:
         for i in range(self._skip): # Loop for the number of frames to skip
             obs, reward, done, truncate, info = self.env.step(action) # This actually moves the mario in the game
             
+            # Taking the max of the last 2 frames
             if i == self._skip - 2:
                 self._obs_buffer[0] = obs
             elif i == self._skip - 1:
@@ -49,14 +45,14 @@ class SkipFrame:
         return max_frame, total_reward, done, truncate, info # Returns the final screen of the skip, the sum of all points
 
 
-class GrayScaleObservation(gym.ObservationWrapper): # This class turns the game from (RGB) -> Black & White
+class GrayScalePermutation(gym.ObservationWrapper): # This class turns the game from (RGB) -> Black & White
     def __init__(self, env):
         super().__init__(env)
         obs_shape = self.observation_space.shape[:2] # Getting the ht. & wt. of the screen.
         self.observation_space = Box( # This line redefines the vision of neural network (from 3 colors to 1 color)
             low=0,
             high=255,
-            shape=obs_shape,
+            shape=(1, obs_shape[0], obs_shape[1]),
             dtype=np.uint8
         ) 
 
@@ -68,7 +64,6 @@ class GrayScaleObservation(gym.ObservationWrapper): # This class turns the game 
 
     def observation(self, observation): # The main fnx that processes the img.
         observation = self.permute_orientation(observation)
-        observation = T.Grayscale() # This line actually removes the color
-        observation = T(observation) # This line resizes the image
-        return observation
-
+        grayscale = T.Grayscale() # This line actually removes the color
+        resize = T.Resize((84, 84)) # This line resizes the image
+        return resize(grayscale(observation))
