@@ -11,13 +11,13 @@ from collections import deque
 import random
 import time
 import os
-import argparse 
+import argparse
 
 # ==========================================
 # 1. OPTIMIZED ENVIRONMENT WRAPPERS
 # ==========================================
 
-class GrayScaleResize(gym.Wrapper):
+class GrayScaleResize(gym.ObservationWrapper):
     """Combines Grayscale and Resize into one fast OpenCV step."""
     def __init__(self, env, shape=(84, 84)):
         super().__init__(env)
@@ -59,8 +59,9 @@ class FrameStack(gym.Wrapper):
         self.n = n
         self.frames = deque([], maxlen=n)
         shp = env.observation_space.shape
+        # PyTorch expects dimensions to be (Channels, Height, Width)
         self.observation_space = gym.spaces.Box(
-            low=0, high=255, shape=(shp[0], shp[1], n), dtype=np.uint8
+            low=0, high=255, shape=(n, shp[0], shp[1]), dtype=np.uint8
         )
 
     def reset(self):
