@@ -2,7 +2,7 @@ import gymnasium as gym
 import torch
 import numpy as np 
 import gym_super_mario_bros
-import torch.transforms as T 
+import torchvision.transforms as T 
 from gymnasium.wrappers import FrameStack
 from gymnasium.spaces import Box
 from nes_py.wrappers import JoypadSpace
