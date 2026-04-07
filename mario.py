@@ -1,3 +1,4 @@
+import imp
 import gymnasium as gym 
 import torch
 import numpy as np 
@@ -6,6 +7,14 @@ import torchvision.transforms as T
 from gymnasium.wrappers import FrameStack
 from gymnasium.spaces import Box
 from nes_py.wrappers import JoypadSpace
+import cv2
+import random
+import time
+import os
+import argparse
+import torch.nn as nn
+import torch.optim as optim
+from gym_super_mario_bros.actions import COMPLEX_MOVEMENT, SIMPLE_MOVEMENT
 
 
 if torch.backends.mps.is_available():
@@ -66,8 +75,9 @@ class GrayScalePermutation(gym.ObservationWrapper): # This class turns the game 
     
 def create_env(render=False):
     env = gym_super_mario_bros.make("SuperMarioBros-v0", render_mode="human" if render else "rgb_array")       
-    env = JoypadSpace(env, [["right"], ["right", "A"]])
+    env = JoypadSpace(env, SIMPLE_MOVEMENT)
     env = SkipFrame(env, 4) # Skip frames + max pooling
     env = GrayScalePermutation(env) # Grayscale + resize + permute (all-in-one)
     env = FrameStack(env, 4) # Stacking 4 frames together
     return env
+
