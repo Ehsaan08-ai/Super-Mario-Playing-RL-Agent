@@ -1,6 +1,4 @@
-from sympy.printing.pytorch import torch
-import tarfile
-import imp
+from tensorflow.keras.optimizers.legacy import Adam
 import gymnasium as gym 
 import torch
 import numpy as np 
@@ -20,12 +18,7 @@ import torch.optim as optim
 from gym_super_mario_bros.actions import COMPLEX_MOVEMENT, SIMPLE_MOVEMENT
 
 
-if torch.backends.mps.is_available():
-    device = torch.device("mps")
-elif torch.cuda.is_available():
-    device = torch.device("cuda")
-else:
-    device = torch.device("cpu")
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class SkipFrame(gym.Wrapper):
     def __init__(self, env, skip):
@@ -157,3 +150,62 @@ class ReplayBuffer:
             torch.tensor(self.next_state[idxs], dtype=torch.float32).to(device),
             torch.tensor(self.done[idxs], dtype=torch.float32).to(device)
         )
+
+class MarioAgent:
+    def __init__(self, state_dim, action_dim, lr=0.00025, gamma=0.99, epsilon=1.0, epsilon_min=0.05, epsilon_decay=1e-5, tau=0.005):
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.epsilon_min = epsilon_min
+        self.epsilon_decay = epsilon_decay
+        self.tau = tau
+
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'    
+        self.net = MarioNet(state_dim, action_dim).float().to(self.device)
+
+        self.optimizer = optim.Adam(self.net.parameters(), lr=lr, weight_decay=1e-4)
+
+        self.buffer = ReplayBuffer(state_dim, action_dim)
+
+    def choose_action(self, state):
+        if np.random.random() < self.epsilon:
+            action_idx = np.random.randint(self.action_dim)
+        else:
+            state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)
+            q_values = self.net(state_tensor, model="online")
+            action_idx = torch.argmax(q_values).item()
+
+        action = np.zeros(self.action_dim)
+        action[action_idx] = 1.0
+        return action
+    
+    def learn(self, batch_size=32):
+        if self.buffer.size < batch_size:
+            return 0.0
+
+        states, actions, rewards, next_states, dones = self.buffer.sample(batch_size)
+
+        q_values = self.net(states, model='online')
+        current_q = torch.sum(q_values * actions, axis=1, keepdim=True)
+
+        next_q_online = self.net(next_states, model='online')
+        best_actions = torch.argmax(next_q_online, axis=1, keepdim=True)
+
+        next_q_target = self.net(next_states, model='target')
+        next_q_value = torch.gather(next_q_target, 1, best_actions)
+
+        target_q = rewards + (1 - dones) * self.gamma * next_q_value
+
+        loss = self.loss_fn(current_q, target_q)
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        for online_params, target_params in zip(self.net.online.parameters(), self.net.target.parameters()):
+            target_params.data.copy_(self.tau * online_params.data + (1.0 - self.tau) * target_params.data())
+
+        self.epsilon = max(self.epsilon_min, self.epsilon - self.epsilon_decay)
+        return loss.item()
+
