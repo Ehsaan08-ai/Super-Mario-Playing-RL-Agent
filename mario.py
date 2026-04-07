@@ -1,3 +1,4 @@
+import tarfile
 import imp
 import gymnasium as gym 
 import torch
@@ -80,4 +81,45 @@ def create_env(render=False):
     env = GrayScalePermutation(env) # Grayscale + resize + permute (all-in-one)
     env = FrameStack(env, 4) # Stacking 4 frames together
     return env
+
+class MarioNet(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        c, h, w = input_dim
+
+        # online network -> the active brain that plays the game and learns every step
+        self.online = nn.Sequential(
+            nn.Conv2d(in_channels=c, out_channels=32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(64*7*7, 512),
+            nn.ReLU(),
+            nn.Linear(512, output_dim)
+        )
+
+        self.target = self._create_target_network()
+
+    def _create_target_network(self):
+        target = nn.Sequential(
+            nn.Conv2d(in_channels=self.online[0].in_channels, out_channels=32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(64*7*7, 512),
+            nn.ReLU(),
+            nn.Linear(512, self.online[-1].out_features)
+        )
+        return target
+
+    def forward(self, x, model="online"):
+        if model == "online":
+            return self.online(x)
+        return self.target(x)
 
