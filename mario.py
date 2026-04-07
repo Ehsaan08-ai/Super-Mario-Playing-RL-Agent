@@ -1,8 +1,10 @@
+from sympy.printing.pytorch import torch
 import tarfile
 import imp
 import gymnasium as gym 
 import torch
 import numpy as np 
+from collections import deque
 import gym_super_mario_bros
 import torchvision.transforms as T 
 from gymnasium.wrappers import FrameStack
@@ -123,3 +125,35 @@ class MarioNet(nn.Module):
             return self.online(x)
         return self.target(x)
 
+class ReplayBuffer:
+    def __init__(self, state_dim, action_dim, max_size=100000):
+        self.max_size=max_size
+        self.ptr=0
+        self.size=0
+
+        self.state = np.zeros((max_size, *state_dim), dtype=np.uint8)
+        self.action = np.zeros((max_size, action_dim), dtype=np.float32)
+        self.reward = np.zeros((max_size, 1), dtype=np.float32)
+        self.next_state = np.zeros((max_size, *state_dim), dtype=np.uint8)
+        self.done = np.zeros((max_size, 1), dtype=np.float32)
+
+    def store(self, state, action, reward, next_state, done):
+        self.state[self.ptr] = state
+        self.action[self.ptr] = action
+        self.reward[self.ptr] = reward
+        self.next_state[self.ptr] = next_state
+        self.done[self.ptr] = done
+
+        self.ptr = (self.ptr + 1) % self.max_size
+        self.size = min(self.size + 1, self.max_size)
+
+    def sample(self, batch_size):
+        idxs = np.random.choice(self.size, batch_size, replace=False)
+
+        return(
+            torch.tensor(self.state[idxs], dtype=torch.float32).to(device),
+            torch.tensor(self.action[idxs], dtype=torch.float32).to(device),
+            torch.tensor(self.reward[idxs], dtype=torch.float32).to(device),
+            torch.tensor(self.next_state[idxs], dtype=torch.float32).to(device),
+            torch.tensor(self.done[idxs], dtype=torch.float32).to(device)
+        )
