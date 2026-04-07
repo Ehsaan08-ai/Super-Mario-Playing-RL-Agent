@@ -1,0 +1,21 @@
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+D:\Super-Mario-Playing-RL-Agent\venv\Lib\site-packages\gym\envs\registration.py:555: UserWarning: WARN: The environment SuperMarioBros-v0 is out of date. You should consider upgrading to version `v3`.
+  logger.warn(
+D:\Super-Mario-Playing-RL-Agent\venv\Lib\site-packages\gym\utils\passive_env_checker.py:195: UserWarning: WARN: The result returned by `env.reset()` was not a tuple of the form `(obs, info)`, where `obs` is a observation and `info` is a dictionary containing additional information. Actual type: `<class 'numpy.ndarray'>`
+  logger.warn(
+Traceback (most recent call last):
+  File "D:\Super-Mario-Playing-RL-Agent\mario.py", line 330, in <module>
+    train(num_episodes=args.episodes)
+  File "D:\Super-Mario-Playing-RL-Agent\mario.py", line 243, in train
+    state = env.reset()
+            ^^^^^^^^^^^
+  File "D:\Super-Mario-Playing-RL-Agent\mario.py", line 81, in reset
+    obs = self.env.reset()
+          ^^^^^^^^^^^^^^^^
+  File "D:\Super-Mario-Playing-RL-Agent\venv\Lib\site-packages\gym\core.py", line 379, in reset
+    obs, info = self.env.reset(**kwargs)
+    ^^^^^^^^^
+ValueError: too many values to unpack (expected 2)
