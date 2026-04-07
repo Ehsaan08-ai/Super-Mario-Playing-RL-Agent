@@ -1,4 +1,4 @@
-from tensorflow.keras.optimizers.legacy import Adam
+import argparse
 import gymnasium as gym 
 import torch
 import numpy as np 
@@ -165,6 +165,7 @@ class MarioAgent:
         self.net = MarioNet(state_dim, action_dim).float().to(self.device)
 
         self.optimizer = optim.Adam(self.net.parameters(), lr=lr, weight_decay=1e-4)
+        self.loss_fn = nn.SmoothL1Loss()
 
         self.buffer = ReplayBuffer(state_dim, action_dim)
 
@@ -204,8 +205,109 @@ class MarioAgent:
         self.optimizer.step()
 
         for online_params, target_params in zip(self.net.online.parameters(), self.net.target.parameters()):
-            target_params.data.copy_(self.tau * online_params.data + (1.0 - self.tau) * target_params.data())
+            target_params.data.copy_(self.tau * online_params.data + (1.0 - self.tau) * target_params.data)
 
         self.epsilon = max(self.epsilon_min, self.epsilon - self.epsilon_decay)
         return loss.item()
 
+def train(num_episodes=500):
+    env = create_env()
+    
+    state_dim = env.observation_space.shape
+    action_dim = env.action_space.n
+
+    agent = MarioAgent(state_dim, action_dim)
+
+    best_reward = -float('inf')
+
+    for ep in range(num_episodes):
+        state = env.reset()
+        ep_reward = 0
+        ep_loss = 0.0
+        steps = 0
+
+        while True:
+            action = agent.choose_action(state)
+            next_state, reward, done, info = env.step(np.argmax(action))
+
+            terminal = done or info.get('flag_get', False)
+
+            agent.buffer.store(state, action, reward, next_state, float(terminal))
+
+            loss = agent.learn(batch_size=32)
+            ep_loss += loss
+
+            state = next_state
+            ep_reward += reward
+            steps += 1
+
+            if terminal:
+                break
+
+        avg_loss = ep_loss / steps if steps > 0 else 0
+        print(f"Ep: {ep+1}/{num_episodes} | Reward: {ep_reward:>6.1f} | Steps: {steps:>4} | Eps: {agent.epsilon:.3f} | Loss: {avg_loss:.4f}")
+
+        if ep_reward > best_reward:
+            best_reward = ep_reward
+            torch.save(agent.net.online.state_dict(), "best_mario_model.pth")
+            print(f"New best model saved! (Reward: {best_reward})")
+
+    torch.save(agent.net.online.state_dict(), "final_mario.pth")
+    env.close()
+
+# Testing
+def test(model_path="best_mario_pth", num_episodes=3):
+    if not os.path.exists(model_path):
+        print(f"Error: could not find '{model_path}'. You  must train first!")
+        return
+
+    env = create_env()
+
+    state_dim = env.observation_space.shape
+    action_dim = env.action_space.n
+
+    # Initialize Agent
+    agent = MarioAgent(state_dim, action_dim)
+
+    # Load the saved brain into the online network. 
+    agent.net.online.load_state_dict(torch.load(model_path, map_location=agent.device))
+    agent.net.online.eval()
+
+    agent.epsilon = 0.0 # Set epsilon to 0 so mario only uses his trained brain (no random choice)
+
+    for ep in range(num_episodes):
+        state = env.reset()
+        total_reward = 0
+        done = False
+        info = {}
+
+        while True:
+            env.render()
+
+            # Choose action purely from trained NN
+            action = agent.choose_action(state)
+            next_state, reward, done, info = env.step(np.argmax(action))
+
+            state = next_state
+            total_reward += reward
+
+            time.sleep(0.01)
+            if done or info.get('flag_get', False):
+                break
+
+        print(f"Episode finished. Total Reward: {total_reward} | Distance (X-Pos): {info.get('x_pos', 0)}")
+
+    env.close()
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Mario DQN")
+    parser.add_argument("--mode", type=str, default="train", choices=["train", "test"], help="Use 'train' to train without seeing, 'test' to watch AI Play")
+    parser.add_argument("--episodes", type=int, default=500, help="Number of episodes to train or test.")
+    parser.add_argument("--model", type=str, default="best_mario_model.pth", help="Which saved model file to use for testing.")
+
+    args = parser.parse_args()
+
+    if args.mode == "train":
+        train(num_episodes=args.episodes)
+    else: 
+        test(model_path=args.model, num_episodes=args.episodes)
