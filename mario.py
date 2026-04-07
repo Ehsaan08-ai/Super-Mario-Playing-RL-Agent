@@ -18,7 +18,6 @@ import argparse
 # ==========================================
 
 class GrayScaleResize(gym.ObservationWrapper):
-    """Combines Grayscale and Resize into one fast OpenCV step."""
     def __init__(self, env, shape=(84, 84)):
         super().__init__(env)
         self.shape = shape
@@ -32,7 +31,6 @@ class GrayScaleResize(gym.ObservationWrapper):
         return obs
 
 class SkipFrame(gym.Wrapper):
-    """Returns only every `skip`-th frame, takes max of last 2 frames to avoid flickering."""
     def __init__(self, env, skip=4):
         super().__init__(env)
         self.observation_space = env.observation_space
@@ -42,24 +40,28 @@ class SkipFrame(gym.Wrapper):
         total_reward = 0.0
         done = False
         info = {}
-        last_obs = None
+        obs_buffer = [] 
+        
         for i in range(self.skip):
             obs, reward, done, info = self.env.step(action)
-            if i == self.skip - 2 or i == self.skip - 1:
-                last_obs = obs
+            obs_buffer.append(obs)
             total_reward += reward
             if done:
                 break
-        return last_obs, total_reward, done, info
+                
+        if len(obs_buffer) >= 2:
+            max_frame = np.max(np.stack(obs_buffer[-2:]), axis=0)
+        else:
+            max_frame = obs_buffer[0] 
+            
+        return max_frame, total_reward, done, info
 
 class FrameStack(gym.Wrapper):
-    """Stacks n consecutive frames to give the network a sense of motion/time."""
     def __init__(self, env, n=4):
         super().__init__(env)
         self.n = n
         self.frames = deque([], maxlen=n)
         shp = env.observation_space.shape
-        # PyTorch expects dimensions to be (Channels, Height, Width)
         self.observation_space = gym.spaces.Box(
             low=0, high=255, shape=(n, shp[0], shp[1]), dtype=np.uint8
         )
@@ -235,7 +237,7 @@ class MarioAgent:
 
 def train(num_episodes=500):
     print("=== STARTING TRAINING (HEADLESS) ===")
-    env = gym_super_mario_bros.make('SuperMarioBros-v0')
+    env = gym_super_mario_bros.make('SuperMarioBros2-v0')
     env = apply_wrappers(env)
     
     state_dim = env.observation_space.shape
@@ -272,13 +274,11 @@ def train(num_episodes=500):
         avg_loss = ep_loss / steps if steps > 0 else 0
         print(f"Ep: {ep+1}/{num_episodes} | Reward: {ep_reward:>6.1f} | Steps: {steps:>4} | Eps: {agent.epsilon:.3f} | Loss: {avg_loss:.4f}")
 
-        # Save the best model found during training
         if ep_reward > best_reward:
             best_reward = ep_reward
             torch.save(agent.net.online.state_dict(), "best_mario.pth")
             print(f"  -> New best model saved! (Reward: {best_reward})")
             
-    # Always save a final model when training finishes
     torch.save(agent.net.online.state_dict(), "final_mario.pth")
     print("=== TRAINING COMPLETE. Models saved as 'best_mario.pth' and 'final_mario.pth' ===")
     env.close()
@@ -293,20 +293,15 @@ def test(model_path="best_mario.pth", num_episodes=3):
         return
 
     print(f"=== LOADING MODEL: {model_path} ===")
-    env = gym_super_mario_bros.make('SuperMarioBros-v0')
+    env = gym_super_mario_bros.make('SuperMarioBros2-v0')
     env = apply_wrappers(env)
     
     state_dim = env.observation_space.shape
     action_dim = env.action_space.n
     
-    # Initialize agent
     agent = MarioAgent(state_dim, action_dim)
-    
-    # Load the saved brain into the ONLINE network
     agent.net.online.load_state_dict(torch.load(model_path, map_location=agent.device))
-    agent.net.online.eval() # Put network in evaluation mode
-    
-    # CRITICAL: Set epsilon to 0 so Mario ONLY uses his trained brain (no random moves)
+    agent.net.online.eval() 
     agent.epsilon = 0.0 
 
     for ep in range(num_episodes):
@@ -318,17 +313,12 @@ def test(model_path="best_mario.pth", num_episodes=3):
         print(f"\n--- Watching Episode {ep+1} ---")
 
         while True:
-            # This line makes the game window pop up and render
             env.render() 
-            
-            # Choose action purely from the trained neural network
             action = agent.choose_action(state)
             next_state, reward, done, info = env.step(np.argmax(action))
             
             state = next_state
             total_reward += reward
-            
-            # Small sleep so the game runs at a watchable human speed
             time.sleep(0.01) 
             
             if done or info.get('flag_get', False):
@@ -344,15 +334,10 @@ def test(model_path="best_mario.pth", num_episodes=3):
 # ==========================================
 
 if __name__ == "__main__":
-    # This allows you to control the script from the VSCode terminal
     parser = argparse.ArgumentParser(description="Mario DDQN")
-    parser.add_argument("--mode", type=str, default="train", choices=["train", "test"], 
-                        help="Use 'train' to train headlessly, 'test' to watch the AI play.")
-    parser.add_argument("--episodes", type=int, default=500, 
-                        help="Number of episodes to train or test.")
-    parser.add_argument("--model", type=str, default="best_mario.pth", 
-                        help="Which saved model file to use for testing.")
-    
+    parser.add_argument("--mode", type=str, default="train", choices=["train", "test"])
+    parser.add_argument("--episodes", type=int, default=500)
+    parser.add_argument("--model", type=str, default="best_mario.pth")
     args = parser.parse_args()
 
     if args.mode == "train":
