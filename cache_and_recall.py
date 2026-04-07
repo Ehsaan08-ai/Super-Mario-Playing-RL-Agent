@@ -8,4 +8,3 @@ class Mario(Mario):
         super().__init__(state_dim, action_dim, save_dir)
         self.memory = TensorDictReplayBuffer(storage=LazyMemmapStorage(200000, device="cpu"))
         self.batch_size = 32
-    
