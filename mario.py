@@ -158,11 +158,11 @@ class ReplayBuffer:
         idxs = np.random.choice(self.size, size=batch_size, replace=False)
         
         return (
-            torch.tensor(self.state[idxs], dtype=torch.float32).to('cpu'),
-            torch.tensor(self.action[idxs], dtype=torch.float32).to('cpu'),
-            torch.tensor(self.reward[idxs], dtype=torch.float32).to('cpu'),
-            torch.tensor(self.next_state[idxs], dtype=torch.float32).to('cpu'),
-            torch.tensor(self.done[idxs], dtype=torch.float32).to('cpu')
+            torch.tensor(self.state[idxs], dtype=torch.float32).to('cuda'),
+            torch.tensor(self.action[idxs], dtype=torch.float32).to('cuda'),
+            torch.tensor(self.reward[idxs], dtype=torch.float32).to('cuda'),
+            torch.tensor(self.next_state[idxs], dtype=torch.float32).to('cuda'),
+            torch.tensor(self.done[idxs], dtype=torch.float32).to('cuda')
         )
 
 # ==========================================
